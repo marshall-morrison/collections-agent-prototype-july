@@ -240,13 +240,29 @@
      in the left rail and chat header, just clustered; each pulses in place on a stagger
      so it reads as "working through several things," not a spinner. */
   .agent-voice{display:flex;align-items:center;gap:10px;margin:0 0 18px;font-size:13.5px;color:var(--ink);}
-  .av-icon{position:relative;width:22px;height:22px;flex:0 0 22px;color:var(--hi-200);}
-  .av-star{width:11px;height:11px;position:absolute;top:50%;left:50%;margin:-5.5px 0 0 -5.5px;}
-  .av-n{translate:0 -6px;animation:avPulse 2.4s ease-in-out infinite;}
-  .av-e{translate:6px 0;rotate:90deg;animation:avPulse 2.4s ease-in-out .15s infinite;}
-  .av-s{translate:0 6px;rotate:180deg;animation:avPulse 2.4s ease-in-out .3s infinite;}
-  .av-w{translate:-6px 0;rotate:270deg;animation:avPulse 2.4s ease-in-out .45s infinite;}
-  @keyframes avPulse{0%,100%{scale:1;opacity:.8;}50%{scale:1.2;opacity:1;}}
+  /* Size is a variable so the same mark can drop into the tab strip at a fraction of
+     the worklist banner's size (see .tiny) without a second copy of the markup/CSS. */
+  .av-icon{--av-size:22px;--av-star:11px;--av-off:6px;position:relative;width:var(--av-size);height:var(--av-size);flex:0 0 var(--av-size);color:var(--hi-200);}
+  .av-icon.tiny{--av-size:14px;--av-star:7px;--av-off:4px;}
+  /* Static, resting instance next to the Agent Summary label — same mark, no motion at all. */
+  .av-icon.static{--av-size:15px;--av-star:8px;--av-off:4.5px;margin-right:7px;}
+  .av-icon.static .av-star{animation:none;}
+  .av-star{width:var(--av-star);height:var(--av-star);position:absolute;top:50%;left:50%;margin:calc(var(--av-star) / -2) 0 0 calc(var(--av-star) / -2);}
+  /* Each petal shrinks/expands AND rotates a small amount, not just scale — a tinier,
+     tighter version of the sweep+pulse "ink" treatment used on .cmp-editor.generating
+     elsewhere. A static `rotate` base value sits alongside the animation so the resting
+     orientation is still correct when .static disables the animation outright. rotate is
+     otherwise driven by each petal's own keyframe (rather than left purely as that static
+     value) since only one rotate can be in effect at a time — the keyframe's 0%/100% value
+     IS that petal's resting orientation while animating. */
+  .av-n{translate:0 calc(var(--av-off) * -1);rotate:0deg;animation:avPulseN 2.4s ease-in-out infinite;}
+  .av-e{translate:var(--av-off) 0;rotate:90deg;animation:avPulseE 2.4s ease-in-out .15s infinite;}
+  .av-s{translate:0 var(--av-off);rotate:180deg;animation:avPulseS 2.4s ease-in-out .3s infinite;}
+  .av-w{translate:calc(var(--av-off) * -1) 0;rotate:270deg;animation:avPulseW 2.4s ease-in-out .45s infinite;}
+  @keyframes avPulseN{0%,100%{scale:1;rotate:0deg;opacity:.8;}50%{scale:1.24;rotate:16deg;opacity:1;}}
+  @keyframes avPulseE{0%,100%{scale:1;rotate:90deg;opacity:.8;}50%{scale:1.24;rotate:106deg;opacity:1;}}
+  @keyframes avPulseS{0%,100%{scale:1;rotate:180deg;opacity:.8;}50%{scale:1.24;rotate:196deg;opacity:1;}}
+  @keyframes avPulseW{0%,100%{scale:1;rotate:270deg;opacity:.8;}50%{scale:1.24;rotate:286deg;opacity:1;}}
   @media (prefers-reduced-motion:reduce){.av-star{animation:none !important;}}
   .agent-voice strong{font-family:"Geist Mono",ui-monospace,SFMono-Regular,monospace;color:var(--hi-200);font-weight:700;}
   .filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;}
@@ -365,8 +381,6 @@
   .tab{background:none;border:none;padding:11px 0;font-size:14px;color:var(--helper);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:7px;transition:color .16s ease;}
   .tab.active{color:var(--ink);font-weight:600;}
   .tab-underline{position:absolute;left:0;bottom:-1px;width:0;height:2px;background:var(--ink);border-radius:2px;transition:transform .3s cubic-bezier(.4,0,.2,1),width .3s cubic-bezier(.4,0,.2,1);}
-  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.35)}}
-  .tab-dot{width:8px;height:8px;border-radius:50%;background:var(--critical);flex:0 0 8px;animation:pulse 1.8s ease-in-out infinite;}
   /* panel */
   .panel{padding:16px 22px 48px;}
   /* sticky action count strip */
@@ -584,14 +598,11 @@
   .perms-link{font-size:12.5px;font-weight:600;color:var(--helper);cursor:pointer;}
   .perms-link:hover{color:var(--blue);}
   .agent-summary{position:relative;overflow:hidden;background:var(--info-surface);border:1px solid rgba(36,118,216,.22);border-radius:6px;padding:16px 18px 14px;}
-  .agent-summary .as-label{color:var(--hi-200);margin-bottom:11px;}
+  .agent-summary .as-label{color:var(--hi-200);margin-bottom:11px;display:flex;align-items:center;}
   .agent-summary .as-body{font-size:13px;line-height:1.6;color:var(--ink);}
   .agent-summary .as-body strong{font-weight:700;}
   .as-bullets{margin:0;padding-left:18px;color:var(--ink);}
   .as-bullets li{margin-bottom:8px;} .as-bullets li:last-child{margin-bottom:0;}
-  /* "live" — plays while the summary types out on detail-page open */
-  .agent-summary.live::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--secondary),var(--hi-100),transparent);background-size:200% 100%;animation:aiSweep 1.1s linear infinite;z-index:3;}
-  .agent-summary.live::after{content:"";position:absolute;inset:0;border-radius:6px;pointer-events:none;box-shadow:inset 0 0 0 1.5px var(--secondary);animation:aiPulse 1.1s ease-in-out infinite;z-index:2;}
   .as-ask{margin-top:14px;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--tertiary);background:var(--tertiary);color:var(--ink);border-radius:6px;padding:8px 15px;font-size:13px;font-weight:500;cursor:pointer;transition:background-color .12s ease,border-color .12s ease;}
   .as-ask .as-ask-ic{width:15px;height:15px;display:flex;}
   .as-ask .as-ask-ic svg{width:15px;height:15px;}

@@ -44,9 +44,9 @@ function mdToHtml(t){ return t.trim().split(/\n\n+/).map(p=>`<p>${p.replace(/\*\
 function mdInline(t){ return t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>'); }
 // Four copies of the same NAV_ICON.agent glyph pointing outward from a shared center —
 // the "agent identity" mark for the worklist's status line (see .agent-voice below).
-function agentClusterIcon(){
+function agentClusterIcon(extraClass){
   const path = '<path fill="currentColor" d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/>';
-  return `<span class="av-icon">
+  return `<span class="av-icon${extraClass?` ${extraClass}`:""}">
     <svg class="av-star av-n" viewBox="0 0 24 24">${path}</svg>
     <svg class="av-star av-e" viewBox="0 0 24 24">${path}</svg>
     <svg class="av-star av-s" viewBox="0 0 24 24">${path}</svg>
@@ -60,41 +60,8 @@ function agentClusterIcon(){
 // Approve without digging further — what was asked, the state of the invoice, and why
 // approving is safe (no dispute, nothing outside what was requested).
 function renderAgentSummary(s){
-  const bullets = s.agentSummary;
-  const items = bullets.map((b,i)=>
-    (!agentSummaryLive || agentSummaryTyped[i]) ? `<li>${mdInline(b)}</li>` : `<li data-as-b="${i}"></li>`
-  ).join("");
+  const items = s.agentSummary.map(b=>`<li>${mdInline(b)}</li>`).join("");
   return `<ul class="as-bullets">${items}</ul>`;
-}
-// Types each Agent Summary section into place character-by-character — the same real-time
-// streaming treatment as the AI-refine draft composer (see typeInto), not a CSS-only effect.
-// Re-queries the target by selector on every tick rather than caching the element, so an
-// unrelated re-render mid-animation (e.g. clicking Pause) doesn't leave it typing into a
-// detached node — it just picks up the freshly-rendered placeholder and keeps going.
-function typeIntoSelector(selector, text, done){
-  const plain = text.replace(/\*\*/g, "");
-  let i = 0;
-  const step = ()=>{
-    const el = document.querySelector(selector);
-    if(!el) return; // page navigated away — stop quietly
-    if(i >= plain.length){ el.innerHTML = mdInline(text); done && done(); return; }
-    i += 2 + Math.floor(Math.random()*3);
-    el.textContent = plain.slice(0, i);
-    setTimeout(step, 13);
-  };
-  step();
-}
-function playAgentSummaryTyping(){
-  agentSummaryTyped = {};
-  const bullets = SCENARIO.agentSummary;
-  const steps = bullets.map((text,i)=>[`[data-as-b="${i}"]`, text, ()=>{ agentSummaryTyped[i] = true; }]);
-  let idx = 0;
-  const next = ()=>{
-    if(idx >= steps.length){ agentSummaryLive = false; render(); return; }
-    const [sel, text, markDone] = steps[idx++];
-    typeIntoSelector(sel, text, ()=>{ markDone(); next(); });
-  };
-  next();
 }
 function initials(n){ return n.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(); }
 function entityClass(e){ return {customer:"customer",system:"system",dunning:"system",agent:"agent",merchant:"merchant"}[e]||"system"; }
@@ -550,8 +517,6 @@ let showBcc = false;
 let attachPickerOpen = false;
 let agentEscalated = false;
 let agentPaused = false;
-let agentSummaryLive = false;    // true while the Agent Summary is being typed out on detail-page open
-let agentSummaryTyped = {}; // bullet index -> finished typing? lets an unrelated re-render mid-animation (e.g. Pause) preserve already-typed bullets instead of blanking them
 let activityFilter = "all";     // "all" | "email" — Activity tab
 // scheduled tab state
 let editingTask = null;       // task id being edited
@@ -906,7 +871,7 @@ function renderInbox(){
       <div class="agent-voice">
         ${agentClusterIcon()}
         <span class="av-text">${needsReviewCount>0
-          ? `I have <strong>${needsReviewCount}</strong> action${needsReviewCount===1?"":"s"} ready for your review`
+          ? `<strong>${needsReviewCount}</strong> action${needsReviewCount===1?"":"s"} ready for your review`
           : `Nothing needs your review right now`}</span>
       </div>
       <div class="filter-row">
@@ -1590,8 +1555,8 @@ function renderDetailHeader(){
     </div>
     <section class="finger">
       <div class="left">
-        <div class="agent-summary${agentSummaryLive?" live":""}">
-          <div class="as-label">Agent Summary</div>
+        <div class="agent-summary">
+          <div class="as-label">${agentClusterIcon("static")}Agent Summary</div>
           <div class="as-body">${renderAgentSummary(SCENARIO)}</div>
         </div>
       </div>
@@ -1607,7 +1572,7 @@ function renderDetailHeader(){
       </div>
     </section>
     <nav class="tabs">
-      <button class="tab ${activeTab==="actions"?"active":""}" data-tab="actions">Actions${pendingCount>0?`<span class="tab-dot"></span>`:""}</button>
+      <button class="tab ${activeTab==="actions"?"active":""}" data-tab="actions">Actions${pendingCount>0?agentClusterIcon("tiny"):""}</button>
       <button class="tab ${activeTab==="activity"?"active":""}" data-tab="activity">Activity</button>
       <button class="tab ${activeTab==="scheduled"?"active":""}" data-tab="scheduled">Scheduled</button>
       <span class="tab-underline" aria-hidden="true"></span>
@@ -2052,7 +2017,7 @@ function render(){
   if(view==="billing"){
     main.innerHTML = renderTopbar(TB.billing) + renderBilling();
     const cab = $("collAgentBtn");
-    if(cab) cab.onclick=()=>{ view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null; threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set(); expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false; openNewEvents=new Set(); recipientPills={}; draftHistory={}; draftRedo={}; aiGenerating=false; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; agentPaused=false; activeTab="actions"; activityFilter="all"; agentSummaryLive=true; agentSummaryTyped={}; render(); playAgentSummaryTyping(); };
+    if(cab) cab.onclick=()=>{ view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null; threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set(); expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false; openNewEvents=new Set(); recipientPills={}; draftHistory={}; draftRedo={}; aiGenerating=false; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; agentPaused=false; activeTab="actions"; activityFilter="all"; render(); };
   } else if(view==="customer"){
     main.innerHTML = renderTopbar(TB.customer()) + renderCustomer();
     main.querySelectorAll("[data-nav-to-detail]").forEach(el=>el.onclick=()=>{
@@ -2060,8 +2025,7 @@ function render(){
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
       openNewEvents=new Set(); recipientPills={}; draftHistory={}; draftRedo={}; aiGenerating=false; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; agentPaused=false;
-      activeTab="actions"; activityFilter="all"; agentSummaryLive=true; agentSummaryTyped={}; render();
-      playAgentSummaryTyping();
+      activeTab="actions"; activityFilter="all"; render();
     });
     $("backBtn") && ($("backBtn").onclick=()=>{ view="inbox"; render(); });
   } else if(view==="inbox"){
@@ -2111,8 +2075,7 @@ function render(){
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
       openNewEvents=new Set(); recipientPills={}; draftHistory={}; draftRedo={}; aiGenerating=false; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; agentPaused=false;
-      activeTab="actions"; activityFilter="all"; agentSummaryLive=true; agentSummaryTyped={}; render();
-      playAgentSummaryTyping();
+      activeTab="actions"; activityFilter="all"; render();
     });
   } else {
     main.innerHTML = renderTopbar(TB.detail())+renderDetailHeader()+`<div class="panel" id="panel"></div>`;
