@@ -55,16 +55,18 @@ function mdInline(t){ return t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>'); 
 // already surfaces. The only reason the count varies is a second Key facts bullet.
 // Slot is derived from position, not a parallel array: first = Trigger, last = Recommendation,
 // everything between is Key facts - so this keeps working whether agentSummary has 3 or 4 items.
-// Label only prints on the first bullet of a slot - a second Key facts bullet doesn't repeat the caption.
+// When Key facts is 2 strings, they render as ONE block of text (joined with a space), not two
+// separate lines with a gap between them - it's one fact continuing into a second sentence, not
+// two distinct list entries.
 function renderAgentSummary(s){
   const n = s.agentSummary.length;
-  let prevSlot = null;
-  const items = s.agentSummary.map((b,i)=>{
+  const groups = [];
+  s.agentSummary.forEach((b,i)=>{
     const slot = i===0 ? "Trigger" : (i===n-1 ? "Recommendation" : "Key facts");
-    const label = slot===prevSlot ? "" : `<span class="as-slot">${slot}</span>`;
-    prevSlot = slot;
-    return `<li>${label}<div class="as-line">${mdInline(b)}</div></li>`;
-  }).join("");
+    const g = groups[groups.length-1];
+    if(g && g.slot===slot) g.parts.push(b); else groups.push({slot, parts:[b]});
+  });
+  const items = groups.map(g=>`<li><span class="as-slot">${g.slot}</span><div class="as-line">${g.parts.map(mdInline).join(" ")}</div></li>`).join("");
   return `<ul class="as-bullets">${items}</ul>`;
 }
 function entityClass(e){ return {customer:"customer",system:"system",dunning:"system",agent:"agent",merchant:"merchant"}[e]||"system"; }
