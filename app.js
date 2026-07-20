@@ -711,6 +711,7 @@ let agentEscalated = false;
 let flagPopoverOpen = false;   // small "why are you flagging this?" popover, shown only when turning the flag ON
 let agentPaused = false;
 let invSort = { key:null, dir:"asc" };  // Outstanding Invoices table — sortable Due/Amount headers
+let invPage = 1;  // Outstanding Invoices table — paginates once a customer has more than 3
 let activityFilter = "all";     // "all" | "email" — Activity tab
 // scheduled tab state
 let editingTask = null;       // task id being edited
@@ -1637,9 +1638,15 @@ function sortInvoicesList(list){
   const mul = invSort.dir==="asc" ? 1 : -1;
   return [...list].sort((a,b)=>(invSortValue(a,invSort.key)-invSortValue(b,invSort.key))*mul);
 }
+const INV_PAGE_SIZE = 3;
 function renderDetailHeader(){
   const pendingCount = SCENARIO.proposed.filter((_,i)=>!actionState[i]).length;
-  const invs = sortInvoicesList(SCENARIO.invoices).slice(0,5);
+  const sortedInvs = sortInvoicesList(SCENARIO.invoices);
+  const invTotalPages = Math.max(1, Math.ceil(sortedInvs.length / INV_PAGE_SIZE));
+  invPage = Math.min(Math.max(1, invPage), invTotalPages);
+  const invPageStart = (invPage - 1) * INV_PAGE_SIZE;
+  const invs = sortedInvs.slice(invPageStart, invPageStart + INV_PAGE_SIZE);
+  const invRangeEnd = sortedInvs.length ? Math.min(invPageStart + INV_PAGE_SIZE, sortedInvs.length) : 0;
   const invRows = invs.map(inv=>{
     const isOverdue = (inv.status||"").toLowerCase()==="overdue";
     const od = inv.od>0 ? ` <span class="inv-od">(${inv.od} days overdue)</span>` : "";
@@ -1700,6 +1707,17 @@ function renderDetailHeader(){
             </tbody>
           </table>
         </div>
+        ${sortedInvs.length > INV_PAGE_SIZE ? `<div class="pagination-row">
+          <div class="pagination-controls">
+            <button class="btn-page-arrow" data-inv-page-nav="prev" aria-label="Go to previous page" ${invPage<=1?"disabled":""}>${LU('<path d="m15 18-6-6 6-6"/>')}</button>
+            ${pageNumbersToShow(invPage, invTotalPages).map(n=>
+              n==="…" ? `<span class="pg-ellipsis">…</span>`
+                      : `<button class="pg-num${n===invPage?" active":""}" data-inv-page-goto="${n}" aria-label="Go to page ${n}">${n}</button>`
+            ).join("")}
+            <button class="btn-page-arrow" data-inv-page-nav="next" aria-label="Go to next page" ${invPage>=invTotalPages?"disabled":""}>${LU('<path d="m9 18 6-6-6-6"/>')}</button>
+          </div>
+          <span class="pagination-count">${invPageStart+1}–${invRangeEnd} of ${sortedInvs.length} results</span>
+        </div>` : ""}
       </div>
     </section>
     <nav class="tabs">
@@ -2146,14 +2164,14 @@ function render(){
   if(view==="billing"){
     main.innerHTML = renderTopbar(TB.billing) + renderBilling();
     const cab = $("collAgentBtn");
-    if(cab) cab.onclick=()=>{ view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null; threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set(); expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false; openNewEvents=new Set(); recipientPills={}; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; flagPopoverOpen=false; agentPaused=false; invSort={key:null,dir:"asc"}; activeTab="actions"; activityFilter="all"; render(); };
+    if(cab) cab.onclick=()=>{ view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null; threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set(); expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false; openNewEvents=new Set(); recipientPills={}; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; flagPopoverOpen=false; agentPaused=false; invSort={key:null,dir:"asc"}; invPage=1; activeTab="actions"; activityFilter="all"; render(); };
   } else if(view==="customer"){
     main.innerHTML = renderTopbar(TB.customer()) + renderCustomer();
     main.querySelectorAll("[data-nav-to-detail]").forEach(el=>el.onclick=()=>{
       view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null;
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
-      openNewEvents=new Set(); recipientPills={}; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; flagPopoverOpen=false; agentPaused=false; invSort={key:null,dir:"asc"};
+      openNewEvents=new Set(); recipientPills={}; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; flagPopoverOpen=false; agentPaused=false; invSort={key:null,dir:"asc"}; invPage=1;
       activeTab="actions"; activityFilter="all"; render();
     });
     $("backBtn") && ($("backBtn").onclick=()=>{ view="inbox"; render(); });
@@ -2240,7 +2258,7 @@ function render(){
       view="detail"; actionState = (SCENARIO.initialActionState ? {...SCENARIO.initialActionState} : {}); editingCard=null; editValues={}; expandedCard=null;
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
-      openNewEvents=new Set(); recipientPills={}; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; flagPopoverOpen=false; agentPaused=false; invSort={key:null,dir:"asc"};
+      openNewEvents=new Set(); recipientPills={}; drawerThreadId=null; drawerEditing=false; drawerEditActionIdx=null; agentEscalated=false; flagPopoverOpen=false; agentPaused=false; invSort={key:null,dir:"asc"}; invPage=1;
       activeTab="actions"; activityFilter="all"; render();
     });
   } else {
@@ -2267,6 +2285,8 @@ function render(){
       invSort = invSort.key===k ? { key:k, dir: invSort.dir==="asc"?"desc":"asc" } : { key:k, dir:"asc" };
       render();
     });
+    main.querySelectorAll("[data-inv-page-goto]").forEach(el=>el.onclick=()=>{ invPage=+el.dataset.invPageGoto; render(); });
+    main.querySelectorAll("[data-inv-page-nav]").forEach(el=>el.onclick=()=>{ invPage += el.dataset.invPageNav==="next"?1:-1; render(); });
     main.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
       if(b.dataset.tab==="settings") return;
       activeTab=b.dataset.tab;
