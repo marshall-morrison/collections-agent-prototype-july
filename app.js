@@ -296,10 +296,18 @@ function sortValue(r, key){
     default: return 0;
   }
 }
-function sortRows(rows){
+// Rows with a real detail page behind them (SCENARIOS_BY_ID) always sort as a block above
+// everything else — otherwise the 4 clickable customers get buried among 300 inert filler rows.
+// The chosen sort still applies within each of the two blocks.
+function sortByKey(rows){
   if(!inboxSort.key) return rows;
   const mul = inboxSort.dir==="asc" ? 1 : -1;
   return [...rows].sort((a,b)=>(sortValue(a,inboxSort.key)-sortValue(b,inboxSort.key))*mul);
+}
+function sortRows(rows){
+  const clickable = rows.filter(r=>!!SCENARIOS_BY_ID[r.id]);
+  const rest = rows.filter(r=>!SCENARIOS_BY_ID[r.id]);
+  return [...sortByKey(clickable), ...sortByKey(rest)];
 }
 // Numbered pagination — first, last, current ±1, collapsing everything else behind "…".
 function pageNumbersToShow(current, total){
